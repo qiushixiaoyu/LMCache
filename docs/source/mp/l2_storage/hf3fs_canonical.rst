@@ -1,5 +1,5 @@
 Canonical pack storage on HF3FS
-==============================
+===============================
 
 This opt-in module consolidates the DeepSeek V4.1 canonical-pack CPU storage
 path. It is separate from the normal ``hf3fs`` L2 configuration and from
