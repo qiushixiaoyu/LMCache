@@ -43,7 +43,6 @@ class PackedCanonicalModule(CanonicalObjectModule):
     def __init__(self, ctx: Any, config: dict[str, Any], adapter: Any) -> None:
         super().__init__(ctx, config, adapter)
         self.store_lock = threading.Lock()
-        self.verify_pack_hashes = config.get("verify_pack_hashes", False)
 
     @server_module_handler("canonical.put")
     def put(self, payload: bytes) -> bytes:
@@ -126,7 +125,6 @@ class PackedCanonicalModule(CanonicalObjectModule):
                     values[groups[i]] = unpack(
                         groups[i],
                         objects[i].raw_data.numpy().tobytes(),
-                        self.verify_pack_hashes,
                     )
                 except ValueError:
                     with self.lock:

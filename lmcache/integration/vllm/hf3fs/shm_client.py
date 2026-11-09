@@ -187,7 +187,7 @@ class SharedClient:
         self.defer_release = channel == "unix"
 
     def close(self) -> None:
-        """Drain owned work before releasing buffers, handles and completion resources."""
+        """Drain owned work before releasing its resources."""
         self.release(force=True)
         if self.connection is not None:
             self.connection.close()

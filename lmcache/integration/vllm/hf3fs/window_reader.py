@@ -42,7 +42,7 @@ class Windows:
     def close(self) -> None:
         # Caller must have proved that all native/CUDA work using these views
         # has completed. Missing completion deliberately retains this session.
-        """Drain owned work before releasing buffers, handles and completion resources."""
+        """Release window views after the caller has proved all copies complete."""
         for client, token, data in self.held:
             for value in data:
                 if value is not None:

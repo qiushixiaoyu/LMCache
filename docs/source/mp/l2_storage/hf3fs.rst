@@ -155,3 +155,14 @@ variable to the mount point directory of a real 3FS storage cluster:
 
     HF3FS_MOUNT_POINT=/3fs/stage \
     pytest tests/v1/distributed/test_hf3fs_l2_adapter.py -v
+
+Canonical pack extension
+------------------------
+
+The opt-in DeepSeek canonical pack module adds immutable large-file slots and
+shared descriptor reads. See the setup, ownership and recovery contract below.
+
+.. toctree::
+   :maxdepth: 1
+
+   hf3fs_canonical

@@ -202,7 +202,7 @@ class SharedCanonicalModule(PackedCanonicalModule):
         return result
 
     def close(self) -> None:
-        """Drain owned work before releasing buffers, handles and completion resources."""
+        """Drain owned work before releasing its resources."""
         self.socket.close()
         self.shared.executor.shutdown(wait=True)
         super().close()

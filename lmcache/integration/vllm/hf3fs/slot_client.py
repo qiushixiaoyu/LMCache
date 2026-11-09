@@ -22,10 +22,12 @@ import torch  # noqa: F401 -- initializes libtorch before the native extension
 
 # First Party
 from lmcache.lmcache_hf3fs import LMCacheHf3fsClient
+from lmcache.logging import init_logger
 
 # Local
 from .slot_index import PACK_BYTES, Index, native_key
 
+logger = init_logger(__name__)
 
 class SlotClient:
     def __init__(self, cfg: dict[str, Any], **arena: Any):
@@ -169,6 +171,7 @@ class SlotClient:
         try:
             result = (fid, True, "", self._operate(op, keys, buffers))
         except Exception as error:
+            logger.exception("Canonical slot operation failed")
             result = (fid, False, str(error), [False] * len(keys))
         with self.lock:
             self.completed.append(result)
@@ -212,7 +215,7 @@ class SlotClient:
         self.native.clear_fd_cache()
 
     def close(self) -> None:
-        """Drain owned work before releasing buffers, handles and completion resources."""
+        """Drain owned work before releasing its resources."""
         with self.lock:
             if self.closed:
                 return

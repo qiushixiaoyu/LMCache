@@ -37,7 +37,7 @@ def split_key(key: str) -> tuple[str, str, str]:
 
 
 def group_key(key: str) -> str:
-    """Remove the component name while retaining namespace and chained-prefix identity."""
+    """Return the namespace and chained-prefix identity of a component key."""
     namespace, _, prefix = split_key(key)
     return namespace + "@" + prefix
 

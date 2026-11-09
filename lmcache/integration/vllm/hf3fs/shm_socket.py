@@ -65,7 +65,7 @@ class Server(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
         self.thread.start()
 
     def close(self) -> None:
-        """Drain owned work before releasing buffers, handles and completion resources."""
+        """Drain owned work before releasing its resources."""
         self.shutdown()
         self.server_close()
         self.path.unlink(missing_ok=True)

@@ -19,6 +19,7 @@ import time
 import uuid
 
 # First Party
+from lmcache.logging import init_logger
 from lmcache.v1.multiprocess.posix_shm import (
     shm_create_readwrite,
     shm_munmap,
@@ -28,6 +29,8 @@ from lmcache.v1.multiprocess.posix_shm import (
 
 # Local
 from .pack_format import HEADER, LAYOUT, PACK_SIZE, group_key, split_key
+
+logger = init_logger(__name__)
 
 OFFSETS = {}
 offset = HEADER.size
@@ -284,7 +287,7 @@ class PackPool:
             )
 
     def close(self) -> None:
-        """Drain owned work before releasing buffers, handles and completion resources."""
+        """Drain owned work before releasing its resources."""
         with self.lock:
             self.closing = True
         self.executor.shutdown(wait=True)
