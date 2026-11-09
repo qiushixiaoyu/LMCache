@@ -10,6 +10,7 @@ from types import SimpleNamespace
 import argparse
 import hashlib
 import json
+import os
 import select
 import tempfile
 import time
@@ -48,9 +49,11 @@ def one(
     """Wait for public native task completion with its buffers retained."""
     submit = getattr(client, "submit_batch_" + op)
     fid = submit(keys) if buffers is None else submit(keys, buffers)
+    poller = select.poll()
+    poller.register(client.event_fd(), select.POLLIN)
     deadline = time.monotonic() + 120
     while time.monotonic() < deadline:
-        select.select([client.event_fd()], [], [], 0.1)
+        poller.poll(100)
         completed = client.drain_completions()
         if completed:
             assert len(completed) == 1 and completed[0][0] == fid
@@ -127,13 +130,18 @@ def run(cfg: dict, mode: str, start: int) -> None:
             assert one(legacy, "set", [key], [memoryview(payload)]) == [True]
         finally:
             legacy.close()
+    # FD caches and FDB can legitimately put eventfds above select() limits.
+    held_fds = [os.open(os.devnull, os.O_RDONLY) for _ in range(1024)]
     fresh = SlotClient(cfg)
+    assert fresh.event_fd() >= 1024
     try:
         buffers = [memoryview(bytearray(PACK_BYTES)) for _ in range(2)]
-        assert one(fresh, "get", [key, key + "missing"], buffers) == [True, False]
+        assert one(fresh, "get", [key, key[:-64] + "f" * 64], buffers) == [True, False]
         assert bytes(buffers[0]) == payload
     finally:
         fresh.close()
+        for fd in held_fds:
+            os.close(fd)
     print(json.dumps(dict(mode=mode, start=start, packs=len(ids), passed=True)))
 
 

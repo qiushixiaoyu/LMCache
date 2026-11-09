@@ -183,7 +183,10 @@ class Hf3fsConnector : public ConnectorBase<WorkerHf3fsConn> {
   void do_batch_get(WorkerHf3fsConn& conn, const Request& req) override;
   void do_batch_exists(WorkerHf3fsConn& conn, const Request& req) override;
   void shutdown_connections() override;
-  void on_workers_stopped() override { read_files_.clear(); }
+  void on_workers_stopped() override {
+    read_files_.clear();
+    directories_.clear();
+  }
 
  private:
   std::shared_ptr<MetadataMetrics> metadata_metrics_;

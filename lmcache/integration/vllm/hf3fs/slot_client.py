@@ -29,6 +29,7 @@ from .slot_index import PACK_BYTES, Index, native_key
 
 logger = init_logger(__name__)
 
+
 class SlotClient:
     def __init__(self, cfg: dict[str, Any], **arena: Any):
         # A metadata cache the same size as the payload pool mostly duplicates
@@ -74,8 +75,10 @@ class SlotClient:
         self.collector.start()
 
     def _collect(self) -> None:
+        poller = select.poll()
+        poller.register(self.native.event_fd(), select.POLLIN)
         while not self.stop.is_set():
-            if not select.select([self.native.event_fd()], [], [], 0.1)[0]:
+            if not poller.poll(100):
                 continue
             with self.native_lock:
                 done = self.native.drain_completions()

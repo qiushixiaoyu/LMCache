@@ -474,5 +474,29 @@ int main() {
         "slot offsets / persistent FD / write failure drains / interrupted "
         "write");
   }
+  {
+    reset();
+    Fixture f(std::vector<size_t>(4, 8));
+    auto count_fds = [] {
+      size_t count = 0;
+      for (const auto& entry :
+           std::filesystem::directory_iterator("/proc/self/fd")) {
+        (void)entry;
+        ++count;
+      }
+      return count;
+    };
+    const auto before = count_fds();
+    Hf3fsConnector c(f.path, f.path, 1, 16, 0, -1, 128, 200, false, {}, 0, 0,
+                     "", 16, true);
+    assert(count_fds() > before + 256);
+    f.check(f.read(c));  // New sharded reader also reads original flat objects.
+    c.close();
+    assert(count_fds() ==
+           before);  // close(), not just destruction, releases directories.
+    c.close();
+    assert(count_fds() == before);
+  }
+  pass("close drains sharded directory handles before connector destruction");
   std::cout << tests << " test groups passed\n";
 }

@@ -201,8 +201,10 @@ class DirectoryHandles {
   std::unordered_map<std::string, int> handles_;
 
  public:
-  ~DirectoryHandles() {
+  ~DirectoryHandles() { clear(); }
+  void clear() {
     for (const auto& item : handles_) ::close(item.second);
+    handles_.clear();
   }
   void add(const std::string& path) {
     int fd = ::open(path.c_str(), O_PATH | O_DIRECTORY | O_CLOEXEC);
