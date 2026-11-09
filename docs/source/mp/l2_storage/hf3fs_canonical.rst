@@ -40,9 +40,9 @@ Configuration and provisioning
 ------------------------------
 
 Build LMCache's CPU extensions with the HF3FS SDK available; see :doc:`hf3fs`.
-The canonical index additionally requires the FoundationDB Python binding supporting API version 730 and a compatible FDB
-client library. The existing cluster must already
-provide its FUSE mount and ``3fs-virt/iovs`` registration directory. This module
+The canonical index additionally requires a FoundationDB Python binding
+supporting API version 730 and a compatible FDB client library. The existing
+cluster must provide its FUSE mount and ``3fs-virt/iovs`` registration directory. This module
 does not change storage replication, checksums, NIC configuration or quotas.
 
 Create an isolated root and ``.slots-v1`` directory using ``3fs-admin`` with the

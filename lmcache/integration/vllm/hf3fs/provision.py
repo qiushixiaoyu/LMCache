@@ -54,7 +54,7 @@ def provision(
         return config
 
     def create(i: int) -> None:
-        """Construct the configured adapter and its owned resources."""
+        """Create sparse segment i, or verify an existing segment's exact size."""
         name = target / f"{i:016x}.bin"
         try:
             fd = os.open(name, os.O_RDWR | os.O_CREAT | os.O_EXCL, 0o644)

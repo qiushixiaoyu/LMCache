@@ -46,7 +46,7 @@ def native_key(number: int) -> str:
 
 
 def unpack(value: Any) -> Any:
-    """Decode a complete pack after validating its declared structure and hashes."""
+    """Decode an eight-byte slot counter; preserve a missing FDB value as None."""
     return None if value is None else struct.unpack(">Q", value)[0]
 
 
