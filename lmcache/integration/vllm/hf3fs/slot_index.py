@@ -69,10 +69,10 @@ class Index:
         self.db = fdb.open(cluster_file)
         self.db.options.set_transaction_timeout(10000)
         self.db.options.set_transaction_retry_limit(20)
-        self.cache = OrderedDict()
+        self.cache: OrderedDict[str, int] = OrderedDict()
         self.cache_entries = cache_entries
         self.lock = threading.Lock()
-        self.counts = Counter()
+        self.counts: Counter[str] = Counter()
         config = self.db[self.prefix + b"config"]
         if config is None:
             raise RuntimeError("Slot namespace not provisioned")

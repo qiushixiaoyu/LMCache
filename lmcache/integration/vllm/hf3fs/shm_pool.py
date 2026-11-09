@@ -55,7 +55,7 @@ class Entry:
     generation: int
     refs: int = 0
     touched: float = field(default_factory=time.monotonic)
-    ready: Future = field(default_factory=Future)
+    ready: Future[bool] = field(default_factory=Future)
 
 
 class PackPool:
@@ -67,13 +67,13 @@ class PackPool:
         self.mapping = shm_open_pool_as_mmap(self.name, self.capacity)
         self.loader, self.ttl = loader, ttl
         self.lock = threading.RLock()
-        self.entries = OrderedDict()
-        self.failed = set()
+        self.entries: OrderedDict[str, Entry] = OrderedDict()
+        self.failed: set[str] = set()
         self.free = deque(range(slots))
         self.generations = [0] * slots
-        self.leases = {}
-        self.finished = OrderedDict()
-        self.counts = Counter()
+        self.leases: dict[str, dict[str, Any]] = {}
+        self.finished: OrderedDict[str, None] = OrderedDict()
+        self.counts: Counter[str] = Counter()
         self.active = 0
         self.closing = False
         self.executor = ThreadPoolExecutor(4, thread_name_prefix="shm-native")
@@ -162,7 +162,9 @@ class PackPool:
         groups = list(dict.fromkeys(group for group, _, _ in plan))
         if not groups or len(groups) > 256:
             raise ValueError("Expected 1..256 packed chunks")
-        owned, refs = [], {}
+        owned: list[tuple[str, Entry]] = []
+        refs: dict[str, Entry] = {}
+        entry: Entry | None
         with self.lock:
             for previous in releases:
                 self._finish(previous)

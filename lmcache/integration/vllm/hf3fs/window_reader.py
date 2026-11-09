@@ -5,7 +5,8 @@
 from __future__ import annotations
 
 # Standard
-from typing import Any
+from concurrent.futures import Future
+from typing import Any, cast
 import time
 
 # First Party
@@ -17,7 +18,7 @@ class Windows:
         if not clients or any(c.channel != "unix" for c in clients):
             raise ValueError("Merged windows require Unix descriptor clients")
         self.clients = clients
-        self.held = []
+        self.held: list[tuple[Any, str, list[memoryview | None]]] = []
         self.name = None
 
     def get(self, index: int, rows: list[list[Any]]) -> Any:
@@ -85,7 +86,7 @@ def load(store: Any, batches: Any, sources: Any, ready: Any) -> Any:
                 for index, (keys, addresses, sizes) in enumerate(batches):
                     if source_index == 0:
                         waiting = time.perf_counter()
-                        data = future.result()
+                        data = cast(Future[Any], future).result()
                         future = None
                         data_by_window[index] = data
                         client = store.prefetch_clients[index % 2]

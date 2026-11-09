@@ -5,7 +5,7 @@ from __future__ import annotations
 
 # Standard
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 import ctypes
 import os
 import uuid
@@ -39,12 +39,14 @@ def adapt(client: Any) -> Any:
 
 
 class Status:
+    client: SlotClient
+
     def report_status(self) -> dict[str, Any]:
         """Return current resource counts and storage completion metrics."""
         result = (
-            SharedCanonicalModule.report_status(self)
+            SharedCanonicalModule.report_status(cast(SharedCanonicalModule, self))
             if hasattr(self, "shared")
-            else PackedCanonicalModule.report_status(self)
+            else PackedCanonicalModule.report_status(cast(PackedCanonicalModule, self))
         )
         result["canonical_objects"]["native_metadata"] = self.client.metadata_stats()
         result["canonical_objects"]["slot_policy"] = dict(

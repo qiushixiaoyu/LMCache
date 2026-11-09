@@ -52,7 +52,7 @@ class CanonicalObjectModule(DiscoverableModule):
         self.slots = threading.BoundedSemaphore(concurrency)
         self.pool = ThreadPoolExecutor(concurrency, thread_name_prefix="canonical-read")
         self.lock = threading.Lock()
-        self.counts: Counter[str] = Counter()
+        self.counts: Any = Counter()
         self.active = 0
         self.buffer_bytes = 0
         self.closing = False

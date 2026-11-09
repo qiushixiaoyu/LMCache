@@ -61,11 +61,11 @@ class SlotClient:
         self.fd = os.eventfd(0, os.EFD_NONBLOCK | os.EFD_CLOEXEC)
         self.lock = threading.Lock()
         self.native_lock = threading.Lock()
-        self.pending = {}
-        self.completed = []
+        self.pending: dict[int, Future[Any]] = {}
+        self.completed: list[tuple[int, bool, str, list[bool]]] = []
         self.sequence = 0
         self.closed = False
-        self.counts = Counter()
+        self.counts: Counter[str] = Counter()
         self.slots = threading.BoundedSemaphore(64)
         self.executor = ThreadPoolExecutor(12, thread_name_prefix="slot-index")
         self.stop = threading.Event()
@@ -92,7 +92,7 @@ class SlotClient:
     def _io(self, op: str, keys: list[str], buffers: Any = None) -> Any:
         if not keys:
             return []
-        future = Future()
+        future: Future[Any] = Future()
         with self.native_lock:
             fn = getattr(self.native, "submit_batch_" + op)
             fid = fn(keys) if buffers is None else fn(keys, buffers)

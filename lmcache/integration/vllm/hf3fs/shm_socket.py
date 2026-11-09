@@ -72,6 +72,8 @@ class Server(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
 
 
 class Handler(socketserver.BaseRequestHandler):
+    server: Server
+
     def handle(self) -> None:
         """Serve descriptor operations after checking the Unix peer process identity."""
         if not self.server.slots.acquire(blocking=False):

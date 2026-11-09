@@ -51,7 +51,7 @@ def descriptor(group: str, component: str) -> list[Any]:
 def checked_groups(operation: str, rows: list[list[Any]]) -> Any:
     """Validate descriptors and group component rows by immutable pack identity."""
     validate(operation, rows)
-    groups = {}
+    groups: dict[str, dict[str, list[Any]]] = {}
     for row in rows:
         key, size = row[:2]
         _, component, _ = split_key(key)

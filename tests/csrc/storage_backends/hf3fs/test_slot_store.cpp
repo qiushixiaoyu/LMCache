@@ -486,6 +486,12 @@ int main() {
       }
       return count;
     };
+    for (size_t i = 0; i < f.keys.size(); ++i) {
+      const auto hash = std::string(63, '0') + std::to_string(i);
+      std::filesystem::rename(filename(f.path, i),
+                              f.path + "/batch@0x1@0@" + hash + ".data");
+      f.keys[i] = "batch@1@0@" + hash;
+    }
     const auto before = count_fds();
     Hf3fsConnector c(f.path, f.path, 1, 16, 0, -1, 128, 200, false, {}, 0, 0,
                      "", 16, true);

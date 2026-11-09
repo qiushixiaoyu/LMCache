@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 # Standard
-from typing import Any
+from typing import Any, cast
 import mmap
 import os
 import re
@@ -39,13 +39,13 @@ class SharedClient:
         self.registered = 0
         self.pin = False
         self.before_unmap = lambda mapping: None
-        self.mapping = None
-        self.name = None
-        self.lease = None
-        self.counts = {}
+        self.mapping: mmap.mmap | None = None
+        self.name: str | None = None
+        self.lease: str | None = None
+        self.counts: dict[str, Any] = {}
         self.channel = "http"
-        self.connection = None
-        self.pending_releases = []
+        self.connection: socket.socket | None = None
+        self.pending_releases: list[str] = []
         self.defer_release = False
         self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
@@ -131,7 +131,7 @@ class SharedClient:
                 self.name = name
             if self.pin and not self.registered:
                 self.registered = register(self.mapping)
-            values = []
+            values: list[memoryview | None] = []
             for item, row in zip(response["items"], rows, strict=True):
                 if item is None:
                     values.append(None)
@@ -145,7 +145,9 @@ class SharedClient:
                     or generation <= 0
                 ):
                     raise ValueError("Out-of-bounds shared descriptor")
-                values.append(memoryview(self.mapping)[offset : offset + size])
+                values.append(
+                    memoryview(cast(mmap.mmap, self.mapping))[offset : offset + size]
+                )
             self.counts = dict(
                 remote_wait_seconds=received - started,
                 shm_map_validate_seconds=time.perf_counter() - received,
@@ -168,7 +170,7 @@ class SharedClient:
         if not self.pending_releases or (self.defer_release and not force):
             return 0.0
         started = time.perf_counter()
-        value = (
+        value: dict[str, Any] = (
             {"leases": self.pending_releases}
             if self.channel == "unix"
             else {"lease": self.pending_releases[0]}

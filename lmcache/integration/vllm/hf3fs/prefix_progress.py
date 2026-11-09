@@ -11,6 +11,7 @@ from __future__ import annotations
 
 # Standard
 from collections import OrderedDict
+from collections.abc import Iterable
 from typing import Any
 import threading
 
@@ -31,7 +32,7 @@ class PrefixIndex:
         self.chunk = chunk_tokens
         self.hash_tokens = hash_tokens
         self.capacity = capacity
-        self.confirmed = OrderedDict()
+        self.confirmed: OrderedDict[tuple[int, bytes], None] = OrderedDict()
 
     def key(self, hashes: list[bytes], end: int) -> Any:
         """Encode an immutable identity for the corresponding persistence index."""
@@ -76,10 +77,10 @@ class PositiveObjects:
         if capacity <= 0:
             raise ValueError("Capacity must be positive")
         self.capacity = capacity
-        self.known = OrderedDict()
+        self.known: OrderedDict[str, None] = OrderedDict()
         self.lock = threading.Lock()
 
-    def note(self, keys: list[str]) -> None:
+    def note(self, keys: Iterable[str]) -> None:
         """Remember acknowledged positive identities within the LRU capacity."""
         with self.lock:
             for key in keys:
