@@ -3,14 +3,17 @@
 
 #pragma once
 
-#include "../connector_base.h"
-#include "../connector_types.h"
 #include <hf3fs_usrbio.h>
+
 #include <filesystem>
 #include <string>
 #include <thread>
 #include <unordered_set>
 #include <vector>
+
+#include "../connector_base.h"
+#include "../connector_types.h"
+#include "registered_files.h"
 
 // Third Party - sharded flat_hash_set for high-throughput key buffer
 #include "sharded_flat_hash_set.h"
@@ -35,6 +38,8 @@ namespace connector {
  */
 struct WorkerHf3fsConn {
   // File descriptors
+  std::shared_ptr<RegisteredFile> read_lease;
+  uint64_t object_offset = 0;
   int fd = -1;              // Linux file descriptor
   bool registered = false;  // Whether hf3fs_reg_fd succeeded
   std::string file_path;    // Current file path being accessed
@@ -68,7 +73,7 @@ struct WorkerHf3fsConn {
     if (registered) {
       hf3fs_dereg_fd(fd);
     }
-    if (fd >= 0) {
+    if (fd >= 0 && !read_lease) {
       ::close(fd);
     }
     if (read_ior_initialized) {
@@ -134,6 +139,12 @@ class Hf3fsConnector : public ConnectorBase<WorkerHf3fsConn> {
    * @param worker_pool_config Per-operation worker lane configuration
 +  * (default empty, uses shared worker pool). Maps lane keys
 +  * ("lookup", "retrieve", "store", "delete") to worker counts.
+   * @param read_buffer Optional caller-owned 3FS-registered read arena address.
+   * @param read_buffer_size Arena size; every read target must fit inside it.
+   * @param read_buffer_id Raw 16-byte 3FS Iov ID, already registered with FUSE.
+   * The caller must keep the registration and memory alive until close(), and
+   * must not submit overlapping targets concurrently. Failed reads may modify
+   * their targets; only successful completion bits authorize consumption.
    * @throws std::runtime_error if mount_point is invalid or base_paths are not
    * subdirectories
    * @throws std::runtime_error if ior_entries, io_depth, or iov_size are out of
@@ -143,9 +154,20 @@ class Hf3fsConnector : public ConnectorBase<WorkerHf3fsConn> {
                  int num_workers, int ior_entries = 256, int io_depth = 0,
                  int numa_id = -1, size_t iov_size = 209715200,
                  int time_out = 200, bool enable_key_buffer = true,
-                 WorkerPoolConfig worker_pool_config = {});
+                 WorkerPoolConfig worker_pool_config = {},
+                 uintptr_t read_buffer = 0, size_t read_buffer_size = 0,
+                 std::string read_buffer_id = "",
+                 size_t immutable_fd_capacity = 0, bool hash_shards = false);
 
-  ~Hf3fsConnector() override = default;
+  // Join workers before configuration and the key buffer are destroyed.
+  ~Hf3fsConnector() override { close(); }
+
+  std::map<std::string, uint64_t> metadata_stats() const {
+    auto out = metadata_metrics_->snapshot();
+    out["fd_cached"] = read_files_.size();
+    return out;
+  }
+  void clear_fd_cache() { read_files_.clear(); }
 
  protected:
   WorkerHf3fsConn create_connection() override;
@@ -155,10 +177,33 @@ class Hf3fsConnector : public ConnectorBase<WorkerHf3fsConn> {
                      const void* buf, size_t len, size_t chunk_size) override;
   bool do_single_exists(WorkerHf3fsConn& conn, const std::string& key) override;
   bool do_single_delete(WorkerHf3fsConn& conn, const std::string& key) override;
+  // Each worker reads a window of objects using disjoint slices of its Iov.
+  // Windows are bounded by Ior capacity and Iov bytes; completions may arrive
+  // out of order. Failed/short reads retain the per-key failure bitmap.
+  void do_batch_get(WorkerHf3fsConn& conn, const Request& req) override;
   void do_batch_exists(WorkerHf3fsConn& conn, const Request& req) override;
   void shutdown_connections() override;
+  void on_workers_stopped() override { read_files_.clear(); }
 
  private:
+  std::shared_ptr<MetadataMetrics> metadata_metrics_;
+  RegisteredFiles read_files_;
+  DirectoryHandles directories_;
+  bool hash_shards_;
+  int directory_fd(const std::string& path) const {
+    return directories_.get(std::filesystem::path(path).parent_path().string());
+  }
+  std::string legacy_path(const std::string& path) const {
+    auto p = std::filesystem::path(path);
+    return hash_shards_
+               ? (p.parent_path().parent_path().parent_path() / p.filename())
+                     .string()
+               : "";
+  }
+  void open_key(WorkerHf3fsConn& conn, const std::string& key, bool write);
+  static bool slot_key(const std::string& key) {
+    return key.rfind("SLOT1@", 0) == 0;
+  }
   // Configuration
   std::string mount_point_;
   std::vector<std::string> base_paths_;
@@ -167,6 +212,10 @@ class Hf3fsConnector : public ConnectorBase<WorkerHf3fsConn> {
   int numa_id_;
   size_t iov_size_;
   int time_out_;
+  // Caller owns a registered, disjoint target arena until close() drains I/O.
+  uintptr_t read_buffer_;
+  size_t read_buffer_size_;
+  std::string read_buffer_id_;
 
   // Key Buffer (for accelerated exists lookups)
   // Uses sharded flat_hash_set with per-shard locks for high write throughput
