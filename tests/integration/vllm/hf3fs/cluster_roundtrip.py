@@ -23,10 +23,12 @@ from lmcache.integration.vllm.hf3fs.pack_format import COMPONENTS, descriptor, p
 from lmcache.integration.vllm.hf3fs.shm_client import SharedClient
 from lmcache.integration.vllm.hf3fs.slot_client import SlotClient
 from lmcache.integration.vllm.hf3fs.slot_index import PACK_BYTES
-from lmcache.integration.vllm.hf3fs.slot_module import (
-    SlotPackedModule,
-    SlotSharedModule,
+from lmcache.v1.multiprocess.ext_server_module import (
+    ExtServerModuleSpec,
+    build_server_module_router,
+    load_server_module_classes,
 )
+from lmcache.v1.multiprocess.protocols.server_module import ServerModuleCallRequest
 
 
 def group(i: int) -> str:
@@ -70,19 +72,34 @@ def run(cfg: dict, mode: str, start: int) -> None:
         reader_adapter=cfg, concurrency=4, shm_slots=64, verify_pack_hashes=False
     )
     ctx = SimpleNamespace(engine_context=None, config_for=lambda cls: module_cfg)
-    writer = SlotPackedModule.create(ctx)
+    configured = load_server_module_classes(
+        [
+            ExtServerModuleSpec(
+                "lmcache.integration.vllm.hf3fs.decode_module", config=module_cfg
+            )
+        ]
+    )
+    assert len(configured) == 1 and configured[0][0].__name__ == "DecodeModule"
+    writer = configured[0][0].create(ctx)
+    router = build_server_module_router(None, [writer])
+
+    def rpc(operation: str, batch: list[list]) -> list:
+        reply = router.server_module_call(
+            ServerModuleCallRequest(
+                method="canonical." + operation, payload=msgpack.packb(batch)
+            )
+        )
+        assert reply.success, reply.error
+        return msgpack.unpackb(reply.payload)
+
     try:
         if mode == "write":
             for offset in range(0, len(ids), 16):
                 batch = [r for i in ids[offset : offset + 16] for r in rows(i, True)]
-                assert msgpack.unpackb(writer.put(msgpack.packb(batch))) == [0] * len(
-                    batch
-                )
+                assert rpc("put", batch) == [0] * len(batch)
         for i in ids:
-            assert msgpack.unpackb(writer.exists(msgpack.packb(rows(i)))) == [1] * 8
-            assert msgpack.unpackb(writer.get(msgpack.packb(rows(i)))) == [
-                r[2] for r in rows(i, True)
-            ]
+            assert rpc("exists", rows(i)) == [1] * 8
+            assert rpc("get", rows(i)) == [r[2] for r in rows(i, True)]
         # Duplicate writes must keep the original published location/data.
         if mode == "write":
             original = writer.client.index.lookup(
@@ -92,7 +109,7 @@ def run(cfg: dict, mode: str, start: int) -> None:
                 ]
             )
             assert original[0] is not None
-            writer.put(msgpack.packb(rows(ids[0], True)))
+            rpc("put", rows(ids[0], True))
             assert (
                 writer.client.index.lookup(
                     [
@@ -106,7 +123,15 @@ def run(cfg: dict, mode: str, start: int) -> None:
         writer.close()
     with tempfile.TemporaryDirectory(prefix="lc3fs-socket-") as tmp:
         module_cfg["socket_path"] = str(Path(tmp) / "read.sock")
-        reader = SlotSharedModule.create(ctx)
+        configured = load_server_module_classes(
+            [
+                ExtServerModuleSpec(
+                    "lmcache.integration.vllm.hf3fs.prefill_module", config=module_cfg
+                )
+            ]
+        )
+        assert len(configured) == 1 and configured[0][0].__name__ == "PrefillModule"
+        reader = configured[0][0].create(ctx)
         consumer = SharedClient(socket_path=module_cfg["socket_path"])
         consumer.configure("unix")
         try:
